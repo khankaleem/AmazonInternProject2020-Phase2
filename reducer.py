@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import sys
 import json
-
 '''
 The methods applies reverse mapping to ip-metadata column names.
 Input: 
@@ -108,8 +107,8 @@ matched_count = 0
 keyMiss_count = 0
 #total unmatched records
 unmatched_count = 0
-#s3 write limit 
-write_limit = 10
+#initialize reducer output
+reducer_output = ""
 
 #Read every line output from mapper
 for line in sys.stdin:
@@ -137,14 +136,12 @@ for line in sys.stdin:
 
     #check if key is missing in Ip-Metadata records
     if current_key != previous_key:
-        if keyMiss_count < write_limit:
-            print('Missing from Ip-Metadata Records! Primary Key: ' + previous_key)
+        reducer_output += "Missing from Ip-Metadata Records! Primary Key: " + previous_key + "\n"
         keyMiss_count += 1
         previous_key, previous_dyanmoDBJson, previous_identifier = current_key, current_dynamoDBJson, current_identifier
     #check if jsons missmatch
     elif  current_dynamoDBJson != previous_dyanmoDBJson:
-        if unmatched_count < write_limit:
-            print('Value miss match! Key: ' + previous_key)
+        reducer_output += "Value miss match! Key: " + previous_key + "\n"
         unmatched_count += 1
         previous_identifier = None
     #match
@@ -157,3 +154,5 @@ print("Total New Records: " + str(total_ipMetadata_records))
 print("Total Key Misses: " + str(keyMiss_count))
 print("Total Matches: " + str(matched_count))
 print("Total Miss Matches: " + str(unmatched_count))
+if reducer_output != "":
+    print(reducer_output, end = "")
