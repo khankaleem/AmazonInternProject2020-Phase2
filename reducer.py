@@ -144,7 +144,7 @@ for line in sys.stdin:
     #check if jsons missmatch
     elif  current_dynamoDBJson != previous_dyanmoDBJson:
         if unmatched_count < write_limit:
-            print('Value miss match! Key: ' + previous_key + " " + current_key )
+            print('Value miss match! Key: ' + previous_key)
         unmatched_count += 1
         previous_identifier = None
     #match
