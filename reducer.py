@@ -156,12 +156,12 @@ for line in sys.stdin:
         
     #Data completeness failure
     if current_primarykeyValue != previous_primarykeyValue:
-        reducerOutput += "Data completenss failed at key: " + previous_key + "\n"
+        reducerOutput += "Data completenss failed at key: " + previous_primarykeyValue + "\n"
         dataCompletenessFailedCount += 1
         previous_primarykeyValue, previous_dyanmoDBJson, previous_identifier = current_primarykeyValue, current_dynamoDBJson, current_identifier
     #Data integrity failure
     elif  current_dynamoDBJson != previous_dyanmoDBJson:
-        reducerOutput += "Data integrity failed at key: " + previous_key + "\n"
+        reducerOutput += "Data integrity failed at key: " + previous_primarykeyValue + "\n"
         dataIntegrityFailedCount += 1
         previous_identifier = None
     #Matching success
