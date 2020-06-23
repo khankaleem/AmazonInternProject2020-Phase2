@@ -168,7 +168,8 @@ for line in sys.stdin:
     else:
         successCount += 1
         previous_identifier = None
-    
+
+#Output the results to s3 folder specified in the command
 print("Transactions records read: " + str(transactionsRecordCount))
 print("Ip-Metadata records read: " + str(ipMetadataRecordCount))
 print("Data completeness failures: " + str(dataCompletenessFailedCount))
