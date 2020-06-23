@@ -27,7 +27,7 @@ def extractKeyAndIdentifier(dynamoDBJson):
 
     return primarykeyValue, identifier
 
-#Iterate over every line in the input files
+#Iterate over every line in the input files. The input folders in s3 are specified in the command
 for dynamoDBJson in sys.stdin:
     #Get the primary key value and identifier
     primarykeyValue, identifier = extractKeyAndIdentifier(json.loads(dynamoDBJson))
