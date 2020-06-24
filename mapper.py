@@ -3,34 +3,32 @@ import sys
 import json
 
 '''
-The method extracts a key and identifer from a DynamoDB Json which is read from s3
+The method extracts the primary key value from a DynamoDB Json which is read from s3
 Input:
     dynamoDBJson:  Json representing a DynamoDB item
 Output:
     primarykeyValue: The Primary key value of the DynamoDB Json
-    identifier: The identifier is TenantIdTransactionId or RequestId according 
-                to the table to which the json belongs
 '''
-def extractKeyAndIdentifier(dynamoDBJson):
+def extractPrimaryKeyValue(dynamoDBJson):
+
+    #Map containg key as Table name and value as primary key field
+    MapTableToPrimaryKey = {"Transactions" : "TenantIdTransactionId", "Ip-Metadata" : "RequestId"}
 
     #initialize primary key value and identifier
-    primarykeyValue, identifier = None, None
-    
+    primarykeyValue = None
+
     #record belongs to the Tranactions table
-    if "TenantIdTransactionId" in dynamoDBJson:
-        primarykeyValue = dynamoDBJson["TenantIdTransactionId"]["s"]
-        identifier = "TenantIdTransactionId"
+    if MapTableToPrimaryKey["Transactions"] in dynamoDBJson:
+        primarykeyValue = dynamoDBJson[MapTableToPrimaryKey["Transactions"]]["s"]
     #record belongs to Ip-Metadata table
-    elif "RequestId" in dynamoDBJson:
-        primarykeyValue = dynamoDBJson["RequestId"]["s"]
-        identifier = "RequestId"
+    elif MapTableToPrimaryKey["Ip-Metadata"] in dynamoDBJson:
+        primarykeyValue = dynamoDBJson[MapTableToPrimaryKey["Ip-Metadata"]]["s"]
+    return primarykeyValue
 
-    return primarykeyValue, identifier
-
-#Iterate over every line in the input files. The input folders in s3 are specified in the command
+#Iterate over every line in the input files in s3. Specify the path to input files in the command available in Command fil.e
 for dynamoDBJson in sys.stdin:
-    #Get the primary key value and identifier
-    primarykeyValue, identifier = extractKeyAndIdentifier(json.loads(dynamoDBJson))
+    #Get the primary key value
+    primarykeyValue = extractPrimaryKeyValue(json.loads(dynamoDBJson))
     #Check if key exists
     if primarykeyValue is not None:
-        print("{0}\t{1}".format(primarykeyValue, identifier + '#' + dynamoDBJson), end = '')
+        print("{0}\t{1}".format(primarykeyValue, dynamoDBJson), end = '')
