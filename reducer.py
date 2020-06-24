@@ -22,13 +22,8 @@ Input:
 def changeUseCaseIdAndVersion(dynamoDBJson):
     #Get useCaseId
     useCaseId = dynamoDBJson["UsecaseIdAndVersion"]["s"]
-
     #Remove the version part
-    i = len(useCaseId)-1
-    while useCaseId[i] != ':':
-        i = i - 1
-    useCaseId = useCaseId[0:i]
-
+    useCaseId = useCaseId.rsplit(":", 1)[0]
     #restore useCaseId
     dynamoDBJson["UsecaseIdAndVersion"]["s"] = useCaseId
 
@@ -38,6 +33,11 @@ Input:
     dynamoDBJson: Ip-Metadata record in json format
 '''
 def changeNestedColumnNamesInDocumentMetadataList(dynamoDBJson):
+
+    #check for existence of column
+    if "DocumentMetadataList" not in dynamoDBJson:
+        return
+
     '''
     Build the Reverse mapping
     Change the mapping as per the usecase
@@ -51,28 +51,36 @@ def changeNestedColumnNamesInDocumentMetadataList(dynamoDBJson):
     DocumentMetadataList_nestedColumnMapping["generatedDocumentDetailsList"] = "storageAttributesList"
     DocumentMetadataList_nestedColumnMapping["documentTags"] = "otherAttributes"
 
-    #check for existence of columns
-    if "DocumentMetadataList" not in dynamoDBJson or "l" not in dynamoDBJson["DocumentMetadataList"]:
-        return
 
+    '''
+    The method changes names of columns inside the arrayIndex-th object in DocumentMetadataList
+    Input: 
+        arrayIndex: The index of the object in the array DocumentMetadataList
+    '''
+    def changeColumnNamesInArrayObject(arrayIndex):
+        #change all the required names in the arrayIndex-th object in DocumentMetadataList
+        for ipMetadataName, transactionsName in DocumentMetadataList_nestedColumnMapping.items():
+            if ipMetadataName in dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]["m"]:
+                #assign the value at key ipMetadataName, to key transactionsName, and delete the former key
+                dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]["m"][transactionsName] = dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]["m"][ipMetadataName]
+                del dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]["m"][ipMetadataName]
+
+    #get length of DocumentMetadataList array
     n = len(dynamoDBJson["DocumentMetadataList"]["l"])
-    #iterate over every object in array
-    for i in range(n):
-        #check if map object exists
-        if "m" in dynamoDBJson["DocumentMetadataList"]["l"][i]:
-            #get the mapping for ipMetadata nested column 
-            for ipMetadataName, transactionsName in DocumentMetadataList_nestedColumnMapping.items():
-                #change the name
-                if ipMetadataName in dynamoDBJson["DocumentMetadataList"]["l"][i]["m"]:
-                    dynamoDBJson["DocumentMetadataList"]["l"][i]["m"][transactionsName] = dynamoDBJson["DocumentMetadataList"]["l"][i]["m"][ipMetadataName]
-                    del dynamoDBJson["DocumentMetadataList"]["l"][i]["m"][ipMetadataName]
+    #iterate over every object in the array DocumentMetadataList
+    for arrayIndex in range(n):
+        #check if map object exists inside arrayIndex-th object
+        if "m" in dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]:
+            #change column names in object
+            changeColumnNamesInArrayObject(arrayIndex)
+
 
 '''
-The method changes Ip-Metadata  main column names to corresponding Transactions main column names
+The method changes Ip-Metadata  outer column names to corresponding Transactions main column names
 Input: 
     dynamoDBJson: Ip-Metadata record in json format
 '''
-def changeMainColumnNames(dynamoDBJson):
+def changeOuterColumnNames(dynamoDBJson):
     '''
     Build the Reverse mapping
     Change the mapping as per the usecase
@@ -87,13 +95,12 @@ def changeMainColumnNames(dynamoDBJson):
     ipMetadata_Transactions_Mapping["UsecaseIdAndVersion"] = "useCaseId"
     ipMetadata_Transactions_Mapping["DocumentMetadataList"] = "results"
 
-    #get the mapping for ipMetadata main column 
+    #Iterate over the mapping and change the names
     for ipMetadataName, transactionsName in ipMetadata_Transactions_Mapping.items():
-        #change name
         if ipMetadataName in dynamoDBJson:
+            #assign the value at key ipMetadataName, to key transactionsName, and delete the former key
             dynamoDBJson[transactionsName] = dynamoDBJson[ipMetadataName]
             del dynamoDBJson[ipMetadataName]
-
 
 '''
 Removes the nested column storageAttributes from the results column of Transactions record
@@ -102,78 +109,120 @@ Input:
 '''
 def removeStorageAttributes(dynamoDBJson):
     #check for existence of columns
-    if "results" not in dynamoDBJson or "l" not in dynamoDBJson["results"]:
+    if "results" not in dynamoDBJson:
         return
-
+    #get length of results array
     n = len(dynamoDBJson["results"]["l"])
     #Delete storageAttributes in every object inside results column
     for i in range(n):
         if "m" in dynamoDBJson["results"]["l"][i] and "storageAttributes" in dynamoDBJson["results"]["l"][i]["m"]:
             del dynamoDBJson["results"]["l"][i]["m"]["storageAttributes"]
 
-#Parameters of previous line read from mapper
-previous_primarykeyValue = None
-previous_dyanmoDBJson = None
-previous_identifier = None
+#Initialize parameters
+'''
+The variable signifies the value of the primary key,  
+read from previous item.
+'''
+previousPrimarykeyValue = None
 
-#total transactions records
+'''
+The variable signifies the DynamoDB Json of previous 
+item read.
+'''
+previousDyanmoDBJson = None
+
+'''
+The varaible signifies if the parameters of current line 
+need to be compared to the parameters of previous line.
+'''
+checkWithPreviousRequired = False
+
+'''
+The variable stores the total transaction records read.
+'''
 transactionsRecordCount = 0
-#total ip-Metadata records
+
+'''
+The variable signifies the total Ip-Metadata records read.
+'''
 ipMetadataRecordCount = 0
-#total data completeness failed records
+
+'''
+The variable signifies the number of transaction records
+and ip-Metadata records for which a matching primary key 
+value was not found.
+'''
 dataCompletenessFailedCount = 0
-#total integrity failed records
+
+'''
+The variable signifies the number of transaction records 
+for which the primary key value matched, but the DynamoDB 
+Json objects did not match.
+'''
 dataIntegrityFailedCount = 0
-#total matched records
-successCount = 0
-#initialize reducer output
+
+'''
+The variable signifies the number of transaction records 
+which successfully got matched to Ip-metadata records.
+'''
+dataCompletenessAndIntegritySuccessCount = 0
+
+'''
+The varible stores the primary key value of the records for
+which data completeness or integrity failed.
+'''
 reducerOutput = ""
 
 #Read every line output from mapper
 for line in sys.stdin:
     
     #read current parameters from line
-    current_primarykeyValue, current_identifier_dynamoDBJson = line.split('\t')
-    current_identifier, current_dynamoDBJson = current_identifier_dynamoDBJson.split('#', 1)
-    current_dynamoDBJson = json.loads(current_dynamoDBJson)
+    currentPrimarykeyValue, currentDynamoDBJson = line.split('\t')
+    #convert dynamoDBJson to Json object
+    currentDynamoDBJson = json.loads(currentDynamoDBJson)
 
     #Apply Reverse Transformations to Ip-Metadata record
-    if current_identifier == "RequestId":
+    if "RequestId" in currentDynamoDBJson:
         ipMetadataRecordCount += 1
-        changeWorkflowIdentifierMap(current_dynamoDBJson)
-        changeUseCaseIdAndVersion(current_dynamoDBJson)
-        changeNestedColumnNamesInDocumentMetadataList(current_dynamoDBJson)
-        changeMainColumnNames(current_dynamoDBJson)        
+        changeWorkflowIdentifierMap(currentDynamoDBJson)
+        changeUseCaseIdAndVersion(currentDynamoDBJson)
+        changeNestedColumnNamesInDocumentMetadataList(currentDynamoDBJson)
+        changeOuterColumnNames(currentDynamoDBJson) 
     #Remove storage Attributes from Transactions record
     else:
         transactionsRecordCount += 1
-        removeStorageAttributes(current_dynamoDBJson)
+        removeStorageAttributes(currentDynamoDBJson)
     
     #check if previous_identifer exists
-    if previous_identifier is None:
-        previous_primarykeyValue, previous_dyanmoDBJson, previous_identifier = current_primarykeyValue, current_dynamoDBJson, current_identifier
+    if checkWithPreviousRequired is False:
+        previousPrimarykeyValue, previousDyanmoDBJson, checkWithPreviousRequired = currentPrimarykeyValue, currentDynamoDBJson, True
         continue
         
-    #Data completeness failure
-    if current_primarykeyValue != previous_primarykeyValue:
-        reducerOutput += "Data completenss failed at key: " + previous_primarykeyValue + "\n"
+    #Data completeness failure: Matching key for primary key value of previous item not found
+    if currentPrimarykeyValue != previousPrimarykeyValue:
+        reducerOutput += "Data completenss failed at key: " + previousPrimarykeyValue + "\n"
         dataCompletenessFailedCount += 1
-        previous_primarykeyValue, previous_dyanmoDBJson, previous_identifier = current_primarykeyValue, current_dynamoDBJson, current_identifier
-    #Data integrity failure
-    elif  current_dynamoDBJson != previous_dyanmoDBJson:
-        reducerOutput += "Data integrity failed at key: " + previous_primarykeyValue + "\n"
+        previousPrimarykeyValue, previousDyanmoDBJson, checkWithPreviousRequired = currentPrimarykeyValue, currentDynamoDBJson, True
+    #Data integrity failure: Primary key values match but DynamoDB jsons dont match
+    elif  currentDynamoDBJson != previousDyanmoDBJson:
+        reducerOutput += "Data integrity failed at key: " + previousPrimarykeyValue + "\n"
         dataIntegrityFailedCount += 1
-        previous_identifier = None
-    #Matching success
+        checkWithPreviousRequired = False
+    #Both primary key values and DynamoDB jsons match
     else:
-        successCount += 1
-        previous_identifier = None
+        dataCompletenessAndIntegritySuccessCount += 1
+        checkWithPreviousRequired = False
 
-#Output the results to s3 folder specified in the command
+#Check if an unmatched primary key value is left
+if checkWithPreviousRequired is True:
+    reducerOutput += "Data completenss failed at key: " + previousPrimarykeyValue + "\n"
+    dataCompletenessFailedCount += 1
+
+#Write details to s3. Specify the output path in the command(available in Command file)
 print("Transactions records read: " + str(transactionsRecordCount))
 print("Ip-Metadata records read: " + str(ipMetadataRecordCount))
 print("Data completeness failures: " + str(dataCompletenessFailedCount))
 print("Data integrity failures: " + str(dataIntegrityFailedCount))
-print("Successfully matched records: " + str(successCount))
-if  dataCompletenessFailedCount == 0 and dataIntegrityFailedCount == 0:
+print("Successfully matched records: " + str(dataCompletenessAndIntegritySuccessCount))
+if  dataCompletenessFailedCount != 0 or dataIntegrityFailedCount != 0:
     print(reducerOutput, end = "")
