@@ -135,7 +135,7 @@ previousDyanmoDBJson = None
 The varaible signifies if the parameters of current line 
 need to be compared to the parameters of previous line.
 '''
-checkWithPreviousRequired = False
+isComparisonRequiredWithPreviousPrimaryKeyValue = False
 
 '''
 The variable stores the total transaction records read.
@@ -194,27 +194,27 @@ for line in sys.stdin:
         removeStorageAttributes(currentDynamoDBJson)
     
     #check if previous_identifer exists
-    if checkWithPreviousRequired is False:
-        previousPrimarykeyValue, previousDyanmoDBJson, checkWithPreviousRequired = currentPrimarykeyValue, currentDynamoDBJson, True
+    if isComparisonRequiredWithPreviousPrimaryKeyValue is False:
+        previousPrimarykeyValue, previousDyanmoDBJson, isComparisonRequiredWithPreviousPrimaryKeyValue = currentPrimarykeyValue, currentDynamoDBJson, True
         continue
         
     #Data completeness failure: Matching key for primary key value of previous item not found
     if currentPrimarykeyValue != previousPrimarykeyValue:
         reducerOutput += "Data completenss failed at key: " + previousPrimarykeyValue + "\n"
         dataCompletenessFailedCount += 1
-        previousPrimarykeyValue, previousDyanmoDBJson, checkWithPreviousRequired = currentPrimarykeyValue, currentDynamoDBJson, True
+        previousPrimarykeyValue, previousDyanmoDBJson, isComparisonRequiredWithPreviousPrimaryKeyValue = currentPrimarykeyValue, currentDynamoDBJson, True
     #Data integrity failure: Primary key values match but DynamoDB jsons dont match
     elif  currentDynamoDBJson != previousDyanmoDBJson:
         reducerOutput += "Data integrity failed at key: " + previousPrimarykeyValue + "\n"
         dataIntegrityFailedCount += 1
-        checkWithPreviousRequired = False
+        isComparisonRequiredWithPreviousPrimaryKeyValue = False
     #Both primary key values and DynamoDB jsons match
     else:
         dataCompletenessAndIntegritySuccessCount += 1
-        checkWithPreviousRequired = False
+        isComparisonRequiredWithPreviousPrimaryKeyValue = False
 
 #Check if an unmatched primary key value is left
-if checkWithPreviousRequired is True:
+if isComparisonRequiredWithPreviousPrimaryKeyValue is True:
     reducerOutput += "Data completenss failed at key: " + previousPrimarykeyValue + "\n"
     dataCompletenessFailedCount += 1
 
