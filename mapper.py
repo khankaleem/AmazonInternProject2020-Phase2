@@ -1,47 +1,41 @@
 #!/usr/bin/env python3
 import sys
-
-#Possible primary keys
-primaryKeys = ["TenantIdTransactionId", "RequestId"]
+import json
 
 '''
-The method extracts a key and identifer from a DynamoDB Json in string format
+The method extracts the primary key value from a DynamoDB Json which is read from s3.
+Also extracts the reducer output flag of the json.  This reducer output flag specifies
+if the current line should be outputed to the reducer
 Input:
-    dynamoDBJson: String containing a DynamoDB Json
+    dynamoDBJson:  Json representing a DynamoDB item
 Output:
-    primarykey_value: The Primary key value of the DynamoDB Json
-    identifier: The identifier is 0 if the Json belongs to the transactions table,
-                and 1 if the Json belongs to the Ip-Metadata table. 
+    primarykeyValue: The Primary key value of the DynamoDB Json
+    isLineOutputedToReducer: The reducer output flag is true for all ip-metadata records and true for those transactions records having state as COMPLETE
 '''
-def extractKeyAndIdentifier(dynamoDBJson):
+def extractPrimaryKeyValueAndReducerOutputFlag(dynamoDBJson):
 
-    for identifier in range(2):
-        #get primary key
-        primary_key = primaryKeys[identifier]
-        #check if primary key is present in dynamoDBJson
-        if primary_key in dynamoDBJson:
-            
-            #Find the value of primary key
-            index = dynamoDBJson.find(primary_key)
-            start = index + len(primary_key + '":{"s":')
-            end = start
-            while dynamoDBJson[end] != '}':
-                end = end + 1
-            primarykey_value = dynamoDBJson[start+1:end-1]
-            
-            #return the value of primary key and the identifier
-            return primarykey_value, identifier
+    #Map containg key as Table name and value as primary key field
+    dynamoDBTableToPrimaryKeyMap = {"Transactions" : "TenantIdTransactionId", "Ip-Metadata" : "RequestId"}
 
-    return None, None
+    #initialize primaryKeyValue and reducer output flag
+    primarykeyValue = None
+    isLineOutputedToReducer = True
 
+    #record belongs to the Tranactions table
+    if dynamoDBTableToPrimaryKeyMap["Transactions"] in dynamoDBJson:
+        primarykeyValue = dynamoDBJson[dynamoDBTableToPrimaryKeyMap["Transactions"]]["s"]
+        if "state" in dynamoDBJson and dynamoDBJson["state"]["s"] != "COMPLETE":
+            isLineOutputedToReducer = False
+    #record belongs to Ip-Metadata table
+    elif dynamoDBTableToPrimaryKeyMap["Ip-Metadata"] in dynamoDBJson:
+        primarykeyValue = dynamoDBJson[dynamoDBTableToPrimaryKeyMap["Ip-Metadata"]]["s"]
 
-#Iterate over every line in the input files
+    return primarykeyValue, isLineOutputedToReducer
+
+#Iterate over every line in the input files in s3. Specify the path to input files in the command(available in Command file)
 for dynamoDBJson in sys.stdin:
-    #Get the key and identifier
-    key, identifier = extractKeyAndIdentifier(dynamoDBJson)
+    #Get the primary key value
+    primarykeyValue, isLineOutputedToReducer = extractPrimaryKeyValueAndReducerOutputFlag(json.loads(dynamoDBJson))
     #Check if key exists
-    if key is not None:
-        #Attach dynamoDBJson to identifier
-        identifier_dynamoDBJson = str(identifier) + '^' + dynamoDBJson
-        #Print the key and identifier_dynamoDBJson pair
-        print("{0}\t{1}".format(key, identifier_dynamoDBJson), end = '')
+    if primarykeyValue is not None and isLineOutputedToReducer is True:
+        print("{0}\t{1}".format(primarykeyValue, dynamoDBJson), end = '')
