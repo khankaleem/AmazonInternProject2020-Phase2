@@ -1,5 +1,5 @@
-Total old Records: 51	
-Total New Records: 51	
-Total Key Misses: 0	
-Total Matches: 51	
-Total Miss Matches: 0	
+Transactions records read: 51	
+Ip-Metadata records read: 51	
+Data completeness failures: 0	
+Data integrity failures: 51	
+Successfully matched records: 0
