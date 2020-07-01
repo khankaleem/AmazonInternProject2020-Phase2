@@ -69,8 +69,6 @@ def changeNestedColumnNamesInDocumentMetadataList(dynamoDBJson):
     n = len(dynamoDBJson["DocumentMetadataList"]["l"])
     #iterate over every object in the array DocumentMetadataList
     for arrayIndex in range(n):
-        #check if map object exists inside arrayIndex-th object
-        if "m" in dynamoDBJson["DocumentMetadataList"]["l"][arrayIndex]:
             #change column names in object
             changeColumnNamesInArrayObject(arrayIndex)
 
@@ -117,6 +115,53 @@ def removeStorageAttributes(dynamoDBJson):
     for i in range(n):
         if "m" in dynamoDBJson["results"]["l"][i] and "storageAttributes" in dynamoDBJson["results"]["l"][i]["m"]:
             del dynamoDBJson["results"]["l"][i]["m"]["storageAttributes"]
+
+'''
+The method flattens nested column storageAttributesList in results column of Transactions record
+and puts all key value pairs in invoiceStoreAttributes.
+Ony the keys present in flattenKeys are flattened.
+Input: 
+    dynamoDBJson: Transactions record in json format
+'''
+
+def flattenStorageAttributesList(dynamoDBJson):
+    #check for existence of columns
+    if "results" not in dynamoDBJson:
+        return
+
+    #define the map keys to be flattened in storageAttributesList
+    #change the keys acording to the use-case
+    flattenKeys = ["storageTypeSpecificAttributes"]
+
+    def flattenStorageAttributesListObject(storageAttributesList):
+        n = len(storageAttributesList)
+        #flatten every element in the arrray
+        for i in range(n):
+            #get the map key to be flattened
+            for flattenKey in flattenKeys:
+                #flatten the flattenKey Object
+                if flattenKey in storageAttributesList[i]["m"]:
+                    for key, value in storageAttributesList[i]["m"][flattenKey]["m"].items():
+                        storageAttributesList[i]["m"][key] = value
+                    del storageAttributesList[i]["m"][flattenKey]
+            #save the object in storageAttributesList and put it inside invoiceStoreAttributes
+            saveObject = storageAttributesList[i]["m"].copy()
+            storageAttributesList[i]["m"]["invoiceStoreAttributes"] = {}
+            storageAttributesList[i]["m"]["invoiceStoreAttributes"]["m"] =  saveObject
+            #delete all keys in storageAttrubutesList except invoiceStoreAttributes
+            for key in saveObject:
+                if key != "invoiceStoreAttributes":
+                    del storageAttributesList[i]["m"][key]
+                    
+    #get length of results array
+    n = len(dynamoDBJson["results"]["l"])
+    #flatten  storageAttributesList in every element in the results array
+    for i in range(n):
+        if "m" in dynamoDBJson["results"]["l"][i] and "storageAttributesList" in dynamoDBJson["results"]["l"][i]["m"]:
+            #flatten storageAttributesList
+            flattenStorageAttributesListObject(dynamoDBJson["results"]["l"][i]["m"]["storageAttributesList"]["l"])
+
+
 
 #Initialize parameters
 '''
@@ -198,6 +243,7 @@ for line in sys.stdin:
     else:
         sys.stderr.write("reporter:counter:Report,transactionsRecordCount,1\n")
         removeStorageAttributes(currentDynamoDBJson)
+        flattenStorageAttributesList(currentDynamoDBJson)
     
     #check if previous_identifer exists
     if isComparisonRequiredWithPreviousPrimaryKeyValue is False:
