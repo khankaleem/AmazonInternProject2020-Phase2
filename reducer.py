@@ -184,7 +184,7 @@ isComparisonRequiredWithPreviousPrimaryKeyValue = False
 
 
 '''
-Initialize the count variables to be displayed on the master shell under the title/group Report.
+Initialize the count variables to be displayed on the master shell under the title/group ReducerReport.
 The following line of code increases the count of 'counterName' in group 'groupName' by x:
     sys.stderr.write("reporter:counter:groupName,counterName,x")
 '''
@@ -193,13 +193,13 @@ The following line of code increases the count of 'counterName' in group 'groupN
 transactionsRecordCount:
     The variable stores the total transaction records read.
 '''
-sys.stderr.write("reporter:counter:Report,transactionsRecordCount,0\n")
+sys.stderr.write("reporter:counter:Reducer Report,transactionsRecordCount,0\n")
 
 '''
 ipMetadataRecordCount:
     The variable signifies the total Ip-Metadata records read.
 '''
-sys.stderr.write("reporter:counter:Report,ipMetadataRecordCount,0\n")
+sys.stderr.write("reporter:counter:Reducer Report,ipMetadataRecordCount,0\n")
 
 '''
 dataCompletenessFailedCount:
@@ -207,7 +207,7 @@ dataCompletenessFailedCount:
     and ip-Metadata records for which a matching primary key 
     value was not found.
 '''
-sys.stderr.write("reporter:counter:Report,dataCompletenessFailedCount,0\n")
+sys.stderr.write("reporter:counter:Reducer Report,dataCompletenessFailedCount,0\n")
 
 '''
 dataIntegrityFailedCount:
@@ -215,14 +215,14 @@ dataIntegrityFailedCount:
     for which the primary key value matched, but the DynamoDB 
     Json objects did not match.
 '''
-sys.stderr.write("reporter:counter:Report,dataIntegrityFailedCount,0\n")
+sys.stderr.write("reporter:counter:Reducer Report,dataIntegrityFailedCount,0\n")
 
 '''
 dataCompletenessAndIntegritySuccessCount:
     The variable signifies the number of transaction records 
     which successfully got matched to Ip-metadata records.
 '''
-sys.stderr.write("reporter:counter:Report,dataCompletenessAndIntegritySuccessCount,0\n")
+sys.stderr.write("reporter:counter:Reducer Report,dataCompletenessAndIntegritySuccessCount,0\n")
 
 #Read every line output from mapper
 for line in sys.stdin:
@@ -234,14 +234,14 @@ for line in sys.stdin:
 
     #Apply Reverse Transformations to Ip-Metadata record
     if "RequestId" in currentDynamoDBJson:
-        sys.stderr.write("reporter:counter:Report,ipMetadataRecordCount,1\n")
+        sys.stderr.write("reporter:counter:Reducer Report,ipMetadataRecordCount,1\n")
         changeWorkflowIdentifierMap(currentDynamoDBJson)
         changeUseCaseIdAndVersion(currentDynamoDBJson)
         changeNestedColumnNamesInDocumentMetadataList(currentDynamoDBJson)
         changeOuterColumnNames(currentDynamoDBJson)
     #Remove storage Attributes from Transactions record
     else:
-        sys.stderr.write("reporter:counter:Report,transactionsRecordCount,1\n")
+        sys.stderr.write("reporter:counter:Reducer Report,transactionsRecordCount,1\n")
         removeStorageAttributes(currentDynamoDBJson)
         flattenStorageAttributesList(currentDynamoDBJson)
     
@@ -253,19 +253,18 @@ for line in sys.stdin:
     #Data completeness failure: Matching key for primary key value of previous item not found
     if currentPrimarykeyValue != previousPrimarykeyValue:
         print("Data completeness failed at key: " + previousPrimarykeyValue)
-        sys.stderr.write("reporter:counter:Report,dataCompletenessFailedCount,1\n")
+        sys.stderr.write("reporter:counter:Reducer Report,dataCompletenessFailedCount,1\n")
         previousPrimarykeyValue, previousDyanmoDBJson, isComparisonRequiredWithPreviousPrimaryKeyValue = currentPrimarykeyValue, currentDynamoDBJson, True
     #Data integrity failure: Primary key values match but DynamoDB jsons dont match
     elif  currentDynamoDBJson != previousDyanmoDBJson:
         print("Data integrity failed at key: " + previousPrimarykeyValue)
-        sys.stderr.write("reporter:counter:Report,dataIntegrityFailedCount,1\n")
+        sys.stderr.write("reporter:counter:Reducer Report,dataIntegrityFailedCount,1\n")
         isComparisonRequiredWithPreviousPrimaryKeyValue = False
     #Both primary key values and DynamoDB jsons match
     else:
-        sys.stderr.write("reporter:counter:Report,dataCompletenessAndIntegritySuccessCount,1\n")
+        sys.stderr.write("reporter:counter:Reducer Report,dataCompletenessAndIntegritySuccessCount,1\n")
         isComparisonRequiredWithPreviousPrimaryKeyValue = False
-
 #Check if an unmatched primary key value is left
 if isComparisonRequiredWithPreviousPrimaryKeyValue is True:
     print("Data completeness failed at key: " + previousPrimarykeyValue)
-    sys.stderr.write("reporter:counter:Report,dataCompletenessFailedCount,1\n")
+    sys.stderr.write("reporter:counter:Reducer Report,dataCompletenessFailedCount,1\n")
