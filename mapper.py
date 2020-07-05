@@ -2,6 +2,32 @@
 import sys
 import json
 
+
+'''
+Initialize the count variables to be displayed on the master shell under the title/group MapperReport.
+The following line of code increases the count of 'counterName' in group 'groupName' by x:
+    sys.stderr.write("reporter:counter:groupName,counterName,x")
+'''
+
+'''
+transactionsRecordCount:
+    The variable stores the total transaction records read.
+'''
+sys.stderr.write("reporter:counter:Mapper Report,transactionsRecordCount,0\n")
+
+'''
+ipMetadataRecordCount:
+    The variable signifies the total Ip-Metadata records read.
+'''
+sys.stderr.write("reporter:counter:Mapper Report,ipMetadataRecordCount,0\n")
+
+'''
+transactionsRecordCountWithStateComplete:
+    The variable stores the total transaction records read with state as COMPLETE
+'''
+sys.stderr.write("reporter:counter:Mapper Report,transactionsRecordCountWithStateComplete,0\n")
+
+
 '''
 The method extracts the primary key value from a DynamoDB Json which is read from s3.
 Also extracts the reducer output flag of the json.  This reducer output flag specifies
@@ -19,17 +45,22 @@ def extractPrimaryKeyValueAndReducerOutputFlag(dynamoDBJson):
 
     #initialize primaryKeyValue and reducer output flag
     primarykeyValue = None
-    isLineOutputedToReducer = True
+    isLineOutputedToReducer = False
 
     #record belongs to the Tranactions table
     if dynamoDBTableToPrimaryKeyMap["Transactions"] in dynamoDBJson:
+        sys.stderr.write("reporter:counter:Mapper Report,transactionsRecordCount,1\n")
         primarykeyValue = dynamoDBJson[dynamoDBTableToPrimaryKeyMap["Transactions"]]["s"]
-        if "state" in dynamoDBJson and dynamoDBJson["state"]["s"] != "COMPLETE":
-            isLineOutputedToReducer = False
+        if dynamoDBJson["state"]["s"] == "COMPLETE":
+            sys.stderr.write("reporter:counter:Mapper Report,transactionsRecordCountWithStateComplete,1\n")
+            isLineOutputedToReducer = True
+   
     #record belongs to Ip-Metadata table
     elif dynamoDBTableToPrimaryKeyMap["Ip-Metadata"] in dynamoDBJson:
+        sys.stderr.write("reporter:counter:Mapper Report,ipMetadataRecordCount,1\n")
         primarykeyValue = dynamoDBJson[dynamoDBTableToPrimaryKeyMap["Ip-Metadata"]]["s"]
-
+        isLineOutputedToReducer = True
+    
     return primarykeyValue, isLineOutputedToReducer
 
 #Iterate over every line in the input files in s3. Specify the path to input files in the command(available in Command file)
